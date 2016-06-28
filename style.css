@@ -1,0 +1,36 @@
+body {
+    background: #dedfde;
+    font-family: 'Source Serif Pro', serif;
+}
+
+.content {
+    background: #fefefe;
+    max-width: 600px;
+    margin: 100px auto;
+    padding: 32px;
+    border-radius: 1px;
+    box-shadow: rgba(0,0,0,0.2) 0 2px 8px;
+}
+
+button {
+    font-size: 150%;
+    font-family: 'Source Serif Pro', serif;
+}
+
+h2 {
+    opacity: 0.5;
+}
+
+.write {
+    text-align: center;
+}
+
+#status {
+    position: fixed;
+    bottom: 32px;
+    left: 0;
+    right: 0;
+    font-size: 150%;
+    opacity: 0.5;
+    text-align: center;
+}
