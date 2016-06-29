@@ -1,60 +1,95 @@
 
 var ethervote, ethervoteContract;
-var proposalHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
+var proposalHash;
 var contractAddress = '0xa93c0838daa2631bb66eb460ccfd551e16e9306f';
+var totalVotes;
 
 function init() {
-    // set events
-    var seeResultsButton = document.getElementById('see-results');
-    seeResultsButton.addEventListener('click', checkVotes , false);
 
-    var supportButton = document.getElementById('vote-support');
-    supportButton.addEventListener('click', function(){ vote(true);}, false);
-
-    var againstButton = document.getElementById('vote-against');
-    againstButton.addEventListener('click', function(){ vote(false);}, false);
-    
-    var newProposalInput = document.getElementById('new-proposal');
-    newProposalInput.addEventListener('blur', newProposal);
-
-    // get parameters
+    // Get parameters and set up the basic structure
     var proposal = decodeURI(getParameterByName('proposal'));
-
     var proposalText = document.getElementById('proposal');
     proposalText.textContent = proposal;
     
-    proposalHash = web3.sha3(proposal);
+    // Add event listeners
+    document.getElementById('see-results').addEventListener('click', function(){
+        document.getElementById("results").style.opacity = "1";
+        document.getElementById("see-results").style.opacity = "0";
+        checkVotes();
+    } , false);
 
-    // detect web3
-    if (typeof web3 == 'undefined') 
-        alert('Mist required. Download it at ethereum.org');
+    document.getElementById('vote-support').addEventListener('click', function(){ vote(true);}, false);
+    document.getElementById('vote-against').addEventListener('click', function(){ vote(false);}, false);
+    
+    var newProposalInput = document.getElementById('new-proposal');    
+    newProposalInput.addEventListener('keypress', function() {
+        document.getElementById("new-proposal-link").style.display = "block";
+    });
+
+    newProposalInput.addEventListener('blur', newProposal);
+
+    // Check if web3 is present
+    if (typeof web3 === 'undefined') {
+        document.getElementById("results").style.display = "none";
+        document.getElementById("see-results").style.display = "none";
+        document.getElementById("vote-support").style.display = "none";
+        document.getElementById("vote-against").style.display = "none";
+        var message = document.getElementById("message");
+        message.style.display = "block";
+        return;
+    }
+
+    if (!web3.eth.accounts || web3.eth.accounts.length == 0) {
+        document.getElementById("vote-support").style.display = "none";
+        document.getElementById("vote-against").style.display = "none";
+        document.getElementById("add-account").style.display = "block";
+    }
+
+
+    // Do things that require web3
+    proposalHash = web3.sha3(proposal);
+    document.body.style.background = "#" + proposalHash.substr(2,6);
+
+    if (proposalHash == '0xefbde2c3aee204a69b7696d4b10ff31137fe78e3946306284f806e2dfc68b805') {
+        // No Proposals
+        document.getElementById("results").style.display = "none";
+        document.getElementById("see-results").style.display = "none";
+        document.getElementById("vote-support").style.display = "none";
+        document.getElementById("vote-against").style.display = "none";
+        document.getElementById("subtitle").style.display = "none";
+        document.getElementById("proposal").textContent = "Give Stakers a Voice";
+        var message = document.getElementById("message");
+        message.style.display = "block";
+        message.textContent = "This tool will enable anyone to create any statement that ethereum token holders can voice their support or opposition to.";
+    } else {
+        // GET the latest blockchain information
+        web3.eth.filter('latest').watch(function(e, res){
+            if(!e) {
+                console.log('Block arrived ', res);
+                checkVotes();
+            }
+        });        
+    }
 
     // Load the contract
     ethervoteContract = web3.eth.contract([{"constant":false,"inputs":[{"name":"proposalHash","type":"bytes32"},{"name":"pro","type":"bool"}],"name":"vote","outputs":[],"type":"function"},{"anonymous":false,"inputs":[{"indexed":true,"name":"proposalHash","type":"bytes32"},{"indexed":false,"name":"pro","type":"bool"},{"indexed":false,"name":"addr","type":"address"}],"name":"LogVote","type":"event"}]);
 
     ethervote = ethervoteContract.at(contractAddress);
 
-    // GET the latest blockchain information
-    web3.eth.filter('latest').watch(function(e, res){
-        if(!e) {
-            console.log('Block arrived ', res);
-            checkVotes();
-        }
-    });
-
-    checkVotes();
+    
 }
 
 function checkVotes() {
-
+    // Set the texts and variables
     var status = document.getElementById('status');
     status.textContent = 'Calculating votes...';
 
     var proMap = {};
     var antiMap = {};
-
     var logVotes = ethervote.LogVote({proposalHash: proposalHash}, {fromBlock: 1000000});
     
+    // Start the watch
+    console.time('watch')
     logVotes.watch(function(error, res){ 
         if (!error) {
             var totalPro = 0;
@@ -70,24 +105,68 @@ function checkVotes() {
                 antiMap[res.args.addr] = bal;
             }
 
+            if (web3.eth.accounts && web3.eth.accounts[0] == res.args.addr) {
+                if (res.args.pro) {
+                    document.getElementById('vote-support').classList.add("pressed");
+                    document.getElementById('vote-against').classList.remove("pressed");
+                } else {
+                    document.getElementById('vote-support').classList.remove("pressed");
+                    document.getElementById('vote-against').classList.add("pressed");
+                }
+            }
+
             Object.keys(proMap).map(function(a) { totalPro += parseFloat(proMap[a]); });
             Object.keys(antiMap).map(function(a) { totalAgainst += parseFloat(antiMap[a]); });
 
+            totalVotes = totalPro + totalAgainst;
+            console.log('totalVotes', totalVotes);
+
+            document.getElementById("results").style.display = "block";                
             var proResult = document.getElementById('support');
-            proResult.textContent = totalPro;
+            proResult.textContent = convertToString(totalPro, totalVotes);
+            proResult.style.width = Math.round(totalPro/totalVotes)*100 + "%";            
 
             var againstResult = document.getElementById('opposition');
-            againstResult.textContent = totalAgainst;
+            againstResult.textContent = convertToString(totalAgainst, totalVotes);
+            againstResult.style.width = Math.round(totalAgainst/totalVotes)*100 + "%";
+            
+            document.getElementById("message").style.display = "none";
+
+            console.timeEnd('watch');
         }
     })
 
     setTimeout(function(){
         status.textContent = '';
-    }, 2000);
+        console.log(totalVotes);
+        if (!(totalVotes > 0)){
+            document.getElementById("results").style.display = "none";
+            var message = document.getElementById("message");
+            message.textContent = "No votes yet. Vote now!";
+            message.style.display = "block";
+        }
+
+    }, 1000);
+}
+
+function convertToString(vote, total){
+    var magnitude = Math.floor(Math.log10(total));
+
+    if (magnitude <= 3) {
+        return Math.round(vote*10)/10 + " finney";
+    } else if (magnitude < 6) {
+        return Math.round(vote/10)/100 + " ether";
+    } else if (magnitude < 9) {
+        return Math.round(vote/10000)/100 + "k ether";
+    } else {
+        return Math.round(vote/10000000)/100 + " million ether";
+    }
+
 }
 
 function vote(support) {
     // alert(support);
+    console.log('accounts', web3.eth.accounts , web3.eth.accounts.length , web3.eth.accounts && web3.eth.accounts.length > 0)
     if (web3.eth.accounts && web3.eth.accounts.length > 0) {
         console.log(web3.eth.accounts[0]);
         ethervote.vote(proposalHash, support, {from: web3.eth.accounts[0]})
@@ -98,6 +177,9 @@ function vote(support) {
       } else {
         alert('add account')
       }
+
+    document.getElementById("results").style.opacity = "1";
+    document.getElementById("see-results").style.opacity = "0";
 }
 
 
