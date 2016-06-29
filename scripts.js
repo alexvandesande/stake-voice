@@ -56,7 +56,7 @@ function init() {
     proposalHash = web3.sha3(proposal);
     document.body.style.background = "#" + proposalHash.substr(2,6);
 
-    if (proposalHash == '0xefbde2c3aee204a69b7696d4b10ff31137fe78e3946306284f806e2dfc68b805' || proposalHash == '0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470') {
+    if (proposal == 'null' || proposal == '') {
         // No Proposals are set
         document.getElementById("results").style.display = "none";
         document.getElementById("see-results").style.display = "none";
