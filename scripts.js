@@ -34,6 +34,9 @@ function init() {
         document.getElementById("see-results").style.display = "none";
         document.getElementById("vote-support").style.display = "none";
         document.getElementById("vote-against").style.display = "none";
+        document.getElementById("subtitle").style.display = "none";
+        document.getElementById("proposal").textContent = "Give Stakers a Voice";
+        
         var message = document.getElementById("message");
         message.style.display = "block";
         return;
