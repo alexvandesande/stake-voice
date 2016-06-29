@@ -2,7 +2,10 @@
 var ethervote, ethervoteContract;
 var proposalHash;
 var contractAddress = '0xa93c0838daa2631bb66eb460ccfd551e16e9306f';
+var contractAddressTestnet = '0xa93c0838daa2631bb66eb460ccfd551e16e9306f';
+
 var totalVotes;
+var contractABI = [{"constant":false,"inputs":[{"name":"proposalHash","type":"bytes32"},{"name":"pro","type":"bool"}],"name":"vote","outputs":[],"type":"function"},{"anonymous":false,"inputs":[{"indexed":true,"name":"proposalHash","type":"bytes32"},{"indexed":false,"name":"pro","type":"bool"},{"indexed":false,"name":"addr","type":"address"}],"name":"LogVote","type":"event"}];
 
 function init() {
 
@@ -75,11 +78,18 @@ function init() {
     }
 
     // Load the contract
-    ethervoteContract = web3.eth.contract([{"constant":false,"inputs":[{"name":"proposalHash","type":"bytes32"},{"name":"pro","type":"bool"}],"name":"vote","outputs":[],"type":"function"},{"anonymous":false,"inputs":[{"indexed":true,"name":"proposalHash","type":"bytes32"},{"indexed":false,"name":"pro","type":"bool"},{"indexed":false,"name":"addr","type":"address"}],"name":"LogVote","type":"event"}]);
+    web3.eth.getCode(contractAddress, function(e, r) { 
+        console.log(e, r);
+        if (!e) {
+            if (r.length < 3) {
+                contractAddress = contractAddressTestnet;
+            }
 
-    ethervote = ethervoteContract.at(contractAddress);
-
-    
+            // Load the contract
+            ethervoteContract = web3.eth.contract(contractABI);
+            ethervote = ethervoteContract.at(contractAddress);
+        }
+    })    
 }
 
 function checkVotes() {

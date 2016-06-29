@@ -126,7 +126,7 @@ h2 {
 
 #message {
     display: none;
-    padding-bottom: 20px;
+    padding: 30px;
     font-size: 150%;
     font-style: italic;
 }
