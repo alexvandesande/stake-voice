@@ -1,14 +1,10 @@
-
-var ethervote, ethervoteContract;
-var proposalHash;
+// Set some initial variables
+var ethervote, ethervoteContract, proposalHash, totalVotes;
 var contractAddress = '0xa93c0838daa2631bb66eb460ccfd551e16e9306f';
 var contractAddressTestnet = '0xa93c0838daa2631bb66eb460ccfd551e16e9306f';
-
-var totalVotes;
 var contractABI = [{"constant":false,"inputs":[{"name":"proposalHash","type":"bytes32"},{"name":"pro","type":"bool"}],"name":"vote","outputs":[],"type":"function"},{"anonymous":false,"inputs":[{"indexed":true,"name":"proposalHash","type":"bytes32"},{"indexed":false,"name":"pro","type":"bool"},{"indexed":false,"name":"addr","type":"address"}],"name":"LogVote","type":"event"}];
 
 function init() {
-
     // Get parameters and set up the basic structure
     var proposal = decodeURI(getParameterByName('proposal'));
     var proposalText = document.getElementById('proposal');
@@ -20,39 +16,42 @@ function init() {
         document.getElementById("see-results").style.opacity = "0";
         checkVotes();
     } , false);
-
     document.getElementById('vote-support').addEventListener('click', function(){ vote(true);}, false);
     document.getElementById('vote-against').addEventListener('click', function(){ vote(false);}, false);
-    
     var newProposalInput = document.getElementById('new-proposal');    
     newProposalInput.addEventListener('keypress', function() {
         document.getElementById("new-proposal-link").style.display = "block";
     });
-
     newProposalInput.addEventListener('blur', newProposal);
 
-    // Check if web3 is present
-    if (typeof web3 === 'undefined') {
+    if(typeof web3 !== 'undefined' && typeof Web3 !== 'undefined') {
+        // If there's a web3 library loaded, then make your own web3
+        web3 = new Web3(web3.currentProvider);
+    } else if (typeof Web3 !== 'undefined') {
+        // If there isn't then set a provider
+        web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+    } else if(typeof web3 == 'undefined' && typeof Web3 == 'undefined') {
+        // If there is neither then this isn't an ethereum browser
         document.getElementById("results").style.display = "none";
         document.getElementById("see-results").style.display = "none";
         document.getElementById("vote-support").style.display = "none";
         document.getElementById("vote-against").style.display = "none";
         document.getElementById("subtitle").style.display = "none";
         document.getElementById("proposal").textContent = "Give Stakers a Voice";
-        
         var message = document.getElementById("message");
         message.style.display = "block";
-        return;
+        return;    
     }
-
+    
+    // If no accounts are present, show the floating baloon
     if (!web3.eth.accounts || web3.eth.accounts.length == 0) {
-        document.getElementById("vote-support").style.display = "none";
-        document.getElementById("vote-against").style.display = "none";
+        // document.getElementById("vote-support").style.display = "none";
+        // document.getElementById("vote-against").style.display = "none";
         document.getElementById("add-account").style.display = "block";
     }
 
 
-    // Do things that require web3
+    // Get the proposal
     proposalHash = web3.sha3(proposal);
     document.body.style.background = "#" + proposalHash.substr(2,6);
 
@@ -66,9 +65,9 @@ function init() {
         document.getElementById("proposal").textContent = "Give Stakers a Voice";
         var message = document.getElementById("message");
         message.style.display = "block";
-        message.textContent = "This tool will enable anyone to create any statement that ethereum token holders can voice their support or opposition to.";
+        message.textContent = "This tool will enable anyone to create any statement that ethereum token holders can voice their support or opposition to. Statements are not binding and represent only the opinion of those who support it.";
     } else {
-        // GET the latest blockchain information
+        // If proposal is valid, start watching the chain
         web3.eth.filter('latest').watch(function(e, res){
             if(!e) {
                 console.log('Block arrived ', res);
@@ -79,8 +78,8 @@ function init() {
 
     // Load the contract
     web3.eth.getCode(contractAddress, function(e, r) { 
-        console.log(e, r);
         if (!e) {
+            // if bytecode is small, then try switching networks
             if (r.length < 3) {
                 contractAddress = contractAddressTestnet;
             }
@@ -92,24 +91,29 @@ function init() {
     })    
 }
 
-function checkVotes() {
+function checkVotes() {        
     // Set the texts and variables
     var status = document.getElementById('status');
     status.textContent = 'Calculating votes...';
 
     var proMap = {};
     var antiMap = {};
+
+    // LogVote is an event on the contract. Read all since block 1 million
     var logVotes = ethervote.LogVote({proposalHash: proposalHash}, {fromBlock: 1000000});
     
-    // Start the watch
+    // Wait for the events to be loaded
     console.time('watch')
-    logVotes.watch(function(error, res){ 
+    logVotes.watch(function(error, res){
+        // Each vote will execute this function 
         if (!error) {
             var totalPro = 0;
             var totalAgainst = 0;
-
+            
+            // Get the current balance of a voter
             var bal = Number(web3.fromWei(web3.eth.getBalance(res.args.addr), "finney"));
 
+            // Check if they are for or against the statement
             if (res.args.pro) {
                 proMap[res.args.addr] = bal;
                 antiMap[res.args.addr] = 0;
@@ -118,6 +122,7 @@ function checkVotes() {
                 antiMap[res.args.addr] = bal;
             }
 
+            // Check if the current owner has already voted and show that on the interface
             if (web3.eth.accounts && web3.eth.accounts[0] == res.args.addr) {
                 if (res.args.pro) {
                     document.getElementById('vote-support').classList.add("pressed");
@@ -128,29 +133,29 @@ function checkVotes() {
                 }
             }
 
+            // Count up all votes
             Object.keys(proMap).map(function(a) { totalPro += parseFloat(proMap[a]); });
             Object.keys(antiMap).map(function(a) { totalAgainst += parseFloat(antiMap[a]); });
-
             totalVotes = totalPro + totalAgainst;
-            console.log('totalVotes', totalVotes);
 
+            // Show a colored bar with the result
             document.getElementById("results").style.display = "block";                
             var proResult = document.getElementById('support');
             proResult.textContent = convertToString(totalPro, totalVotes);
             proResult.style.width = Math.round(totalPro/totalVotes)*100 + "%";            
-
             var againstResult = document.getElementById('opposition');
             againstResult.textContent = convertToString(totalAgainst, totalVotes);
             againstResult.style.width = Math.round(totalAgainst/totalVotes)*100 + "%";
             
+            // End the calculation
             document.getElementById("message").style.display = "none";
-
             console.timeEnd('watch');
         }
     })
 
     setTimeout(function(){
-        status.textContent = '';
+        // If the app doesn't respond after a timeout it probably has no votes
+        status.textContent = web3.eth.accounts.length + " accounts";
         console.log(totalVotes);
         if (!(totalVotes > 0)){
             document.getElementById("results").style.display = "none";
@@ -158,13 +163,14 @@ function checkVotes() {
             message.textContent = "No votes yet. Vote now!";
             message.style.display = "block";
         }
-
-    }, 1000);
+    }, 2000);
 }
 
 function convertToString(vote, total){
+    // how many 0's are we dealing with
     var magnitude = Math.floor(Math.log10(total));
 
+    // Select the right unit
     if (magnitude <= 3) {
         return Math.round(vote*10)/10 + " finney";
     } else if (magnitude < 6) {
@@ -177,18 +183,26 @@ function convertToString(vote, total){
 
 }
 
+
 function vote(support) {
-    // alert(support);
-    console.log('accounts', web3.eth.accounts , web3.eth.accounts.length , web3.eth.accounts && web3.eth.accounts.length > 0)
+    // Check if there are accounts available
     if (web3.eth.accounts && web3.eth.accounts.length > 0) {
-        console.log(web3.eth.accounts[0]);
+        
+        // Create a dialog requesting the transaction
         ethervote.vote(proposalHash, support, {from: web3.eth.accounts[0]})
-        // checkVotes();
-        var status = document.getElementById('status');
-        status.textContent = 'Waiting for new block...';
+        document.getElementById('status').textContent = 'Waiting for new block...';
 
       } else {
-        alert('add account')
+        
+        mist.requestAccount(function(e, account) {
+            console.log('return account', e, account);
+            if(!e) {
+                // Create a dialog requesting the transaction
+                ethervote.vote(proposalHash, support, {from: account.toLowerCase()})
+                document.getElementById('status').textContent = 'Waiting for new block...';
+            }
+        });
+
       }
 
     document.getElementById("results").style.opacity = "1";
@@ -207,6 +221,7 @@ function getParameterByName(name, url) {
 }
 
 function newProposal() {
+    // When typing a new proposal, generate new dinamic urls
     var newProposal = document.getElementById('new-proposal');
     var newProposalLink = document.getElementById('new-proposal-link');
     newProposalLink.href = '?proposal=' + encodeURI(newProposal.value);

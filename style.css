@@ -67,12 +67,13 @@ h2 {
     background: #eee;
     padding: 20px 10px;
     border-radius: 2px;
+    margin: 0 -32px -32px;
 }
 
 #new-proposal {
     font-family: 'Source Serif Pro', serif;    
     font-size: 150%;
-    width: 556px;
+    width: 600px;
     padding: 5px 10px;
     border-radius: 3px;
     border: solid 2px #ddd;
@@ -81,7 +82,7 @@ h2 {
 #new-proposal-link {
     position: absolute;
     top: 24px;
-    right: 13px;
+    right: 24px;
     background: #333;
     color: #FFF;
     padding: 8px 15px;
