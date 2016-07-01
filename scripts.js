@@ -1,14 +1,16 @@
 // Set some initial variables
-var ethervote, ethervoteContract, proposalHash, totalVotes;
+var ethervote, ethervoteContract, proposalHash, totalVotes, proposal;
 var contractAddress = '0xa93c0838daa2631bb66eb460ccfd551e16e9306f';
 var contractAddressTestnet = '0xa93c0838daa2631bb66eb460ccfd551e16e9306f';
 var contractABI = [{"constant":false,"inputs":[{"name":"proposalHash","type":"bytes32"},{"name":"pro","type":"bool"}],"name":"vote","outputs":[],"type":"function"},{"anonymous":false,"inputs":[{"indexed":true,"name":"proposalHash","type":"bytes32"},{"indexed":false,"name":"pro","type":"bool"},{"indexed":false,"name":"addr","type":"address"}],"name":"LogVote","type":"event"}];
+var history = [];
 
 function init() {
     // Get parameters and set up the basic structure
-    var proposal = decodeURI(getParameterByName('proposal'));
-    var proposalText = document.getElementById('proposal');
-    proposalText.textContent = proposal;
+    proposal = decodeURI(getParameterByName('proposal'));
+    document.getElementById('proposal').textContent = proposal;
+
+    buildMistMenu();
     
     // Add event listeners
     document.getElementById('see-results').addEventListener('click', function(){
@@ -23,6 +25,8 @@ function init() {
         document.getElementById("new-proposal-link").style.display = "block";
     });
     newProposalInput.addEventListener('blur', newProposal);
+
+
 
     if(typeof web3 !== 'undefined' && typeof Web3 !== 'undefined') {
         // If there's a web3 library loaded, then make your own web3
@@ -142,10 +146,13 @@ function checkVotes() {
             document.getElementById("results").style.display = "block";                
             var proResult = document.getElementById('support');
             proResult.textContent = convertToString(totalPro, totalVotes);
-            proResult.style.width = Math.round(totalPro/totalVotes)*100 + "%";            
+            proResult.style.width = Math.round(totalPro*100/totalVotes) + "%";            
             var againstResult = document.getElementById('opposition');
             againstResult.textContent = convertToString(totalAgainst, totalVotes);
-            againstResult.style.width = Math.round(totalAgainst/totalVotes)*100 + "%";
+            againstResult.style.width = Math.round(totalAgainst*100/totalVotes) + "%";
+
+            if (totalVotes>0)
+                mist.menu.update( proposal ,{ badge: Math.round(totalPro*100/totalVotes) + "%" });
             
             // End the calculation
             document.getElementById("message").style.display = "none";
@@ -155,7 +162,7 @@ function checkVotes() {
 
     setTimeout(function(){
         // If the app doesn't respond after a timeout it probably has no votes
-        status.textContent = web3.eth.accounts.length + " accounts";
+        status.textContent = "";
         console.log(totalVotes);
         if (!(totalVotes > 0)){
             document.getElementById("results").style.display = "none";
@@ -185,6 +192,8 @@ function convertToString(vote, total){
 
 
 function vote(support) {
+   console.log('vote', web3.eth.accounts.length);
+ 
     // Check if there are accounts available
     if (web3.eth.accounts && web3.eth.accounts.length > 0) {
         
@@ -193,7 +202,7 @@ function vote(support) {
         document.getElementById('status').textContent = 'Waiting for new block...';
 
       } else {
-        
+        console.log('callbacks', mist.callbacks);
         mist.requestAccount(function(e, account) {
             console.log('return account', e, account);
             if(!e) {
@@ -202,6 +211,7 @@ function vote(support) {
                 document.getElementById('status').textContent = 'Waiting for new block...';
             }
         });
+        console.log('callbacks', mist.callbacks);
 
       }
 
@@ -226,3 +236,42 @@ function newProposal() {
     var newProposalLink = document.getElementById('new-proposal-link');
     newProposalLink.href = '?proposal=' + encodeURI(newProposal.value);
 }
+
+function buildMistMenu() {
+
+    // Add proposal to history
+    if (typeof(Storage) !== "undefined") {
+        // Code for localStorage/sessionStorage.
+        var propHistory = localStorage.propHistory ? localStorage.propHistory.split(',') : [];
+        if (propHistory.indexOf(proposal)<0 && proposal.length > 0)
+            propHistory.unshift(proposal);
+
+        propHistory = propHistory.slice(0,20);
+        localStorage.setItem('propHistory', propHistory.join(','));
+
+        //Build Mist Menu
+        // mist.menu.clear(); 
+        mist.menu.add( 'main' ,{
+            position: 0,
+            name: 'Main Page',
+            selected: typeof proposal == 'undefined' || proposal == 'null'
+        }, function(){
+            window.location.search = '';
+        });
+
+        for (item of propHistory) {
+            if (item.length > 0 && item != 'null') {
+                mist.menu.add( item ,{
+                    name: item,
+                    selected: item == proposal 
+                }, function(){
+                    window.location.search = '?proposal=' + encodeURI(this.name);
+                });
+            }
+        }
+
+    }
+}
+
+
+
