@@ -1,9 +1,10 @@
 // Set some initial variables
-var ethervote, ethervoteContract, proposalHash, totalVotes, proposal;
+var ethervote, ethervoteContract, proposalHash, totalVotes, proposal, totalPro, totalAgainst;
 var voteMap = {};
 
-var contractAddress = '0xa93c0838daa2631bb66eb460ccfd551e16e9306f';
+var contractAddress = '0x8b803d9f2bD4AEaa2a7c5265FB5684Fe3E68C879';
 var contractAddressTestnet = '0xa93c0838daa2631bb66eb460ccfd551e16e9306f';
+
 var contractABI = [{"constant":false,"inputs":[{"name":"proposalHash","type":"bytes32"},{"name":"pro","type":"bool"}],"name":"vote","outputs":[],"type":"function"},{"anonymous":false,"inputs":[{"indexed":true,"name":"proposalHash","type":"bytes32"},{"indexed":false,"name":"pro","type":"bool"},{"indexed":false,"name":"addr","type":"address"}],"name":"LogVote","type":"event"}];
 var history = [];
 
@@ -101,7 +102,7 @@ function init() {
         if (propHistory.indexOf(proposal)<0 && proposal.length > 0)
             propHistory.unshift(proposal);
 
-        propHistory = propHistory.slice(0,20);
+        propHistory = propHistory.slice(0, 10);
         localStorage.setItem('propHistory', propHistory.join(','));
 
         // mist.menu.clear(); 
@@ -113,10 +114,12 @@ function init() {
             window.location.search = '';
         });
 
+        var n = 1;
         for (item of propHistory) {
             if (item.length > 0 && item != 'null') {
                 mist.menu.add( item ,{
                     name: item,
+                    position: n++,
                     selected: item == proposal 
                 }, function(){
                     window.location.search = '?proposal=' + encodeURI(this.name);
@@ -142,7 +145,7 @@ function watchVotes() {
 
         // Each vote will execute this function 
         if (!error) {            
-            // Get the current balance of a voter
+            // Get the current balance of a voter            
             var bal = Number(web3.fromWei(web3.eth.getBalance(res.args.addr), "finney"));
 
             voteMap[res.args.addr] = {balance: bal, support: res.args.pro}; 
@@ -182,32 +185,26 @@ function convertToString(vote, total){
 }
 
 function calculateVotes() {
-    var totalPro = 0;
-    var totalAgainst = 0;
+    totalPro = 0;
+    totalAgainst = 0;
+    totalVotes = 0;
 
     Object.keys(voteMap).map(function(a) { 
-        voteMap[a].balance = Number(web3.fromWei(web3.eth.getBalance(a), "finney")); 
+        // call the function asynchronously 
+        web3.eth.getBalance(a, function(e,r) {
+            voteMap[a].balance = Number(web3.fromWei(r, 'finney'));
+
+            if (voteMap[a].support)
+                totalPro += parseFloat(voteMap[a].balance); 
+            else
+                totalAgainst += parseFloat(voteMap[a].balance);
+
+            updateTotals()             
+        });         
         
-        if (voteMap[a].support)
-            totalPro += parseFloat(voteMap[a].balance); 
-        else
-            totalAgainst += parseFloat(voteMap[a].balance); 
+        
     });
 
-    totalVotes = totalPro + totalAgainst;
-
-    // Show a colored bar with the result
-    document.getElementById("results").style.display = "block";                
-    var proResult = document.getElementById('support');
-    proResult.textContent = convertToString(totalPro, totalVotes);
-    proResult.style.width = Math.round(totalPro*100/totalVotes) + "%";            
-    var againstResult = document.getElementById('opposition');
-    againstResult.textContent = convertToString(totalAgainst, totalVotes);
-    againstResult.style.width = Math.round(totalAgainst*100/totalVotes) + "%";
-
-    if (totalVotes>0)
-        mist.menu.update( proposal ,{ badge: Math.round(totalPro*100/totalVotes) + "%" });
-    
     // End the calculation
     document.getElementById("message").style.display = "none";
     
@@ -222,6 +219,23 @@ function calculateVotes() {
             message.style.display = "block";
         }
     }, 2000);    
+}
+
+function updateTotals() {
+    totalVotes = totalPro + totalAgainst;
+
+    // Show a colored bar with the result
+    document.getElementById("results").style.display = "block";                
+    var proResult = document.getElementById('support');
+    proResult.textContent = convertToString(totalPro, totalVotes);
+    proResult.style.width = Math.round(totalPro*100/totalVotes) + "%";            
+    var againstResult = document.getElementById('opposition');
+    againstResult.textContent = convertToString(totalAgainst, totalVotes);
+    againstResult.style.width = Math.round(totalAgainst*100/totalVotes) + "%";
+
+    if (totalVotes>0)
+        mist.menu.update( proposal ,{ badge: Math.round(totalPro*100/totalVotes) + "%" });
+    
 }
 
 function vote(support) {
