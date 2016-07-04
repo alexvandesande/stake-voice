@@ -117,12 +117,17 @@ h2 {
     overflow: hidden;
     text-overflow: clip;
     white-space: nowrap;
-    transition: width 1s ease-in-out;
+    transition: width 1s ease-in-out, min-width 1s ease-in-out, max-width 1s ease-in-out;
     text-indent: 8px;
 }
 
 #results:hover h3 {
-    width: 50% !important;
+    max-width: 80% !important;
+}
+
+#results:hover h3:hover {
+    min-width: 20% !important;
+    max-width: 99.5% !important;
 }
 
 #message {

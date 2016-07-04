@@ -19,7 +19,6 @@ function init() {
     document.getElementById('see-results').addEventListener('click', function(){
         document.getElementById("results").style.opacity = "1";
         document.getElementById("see-results").style.opacity = "0";
-        watchVotes();
     } , false);
     document.getElementById('vote-support').addEventListener('click', function(){ vote(true);}, false);
     document.getElementById('vote-against').addEventListener('click', function(){ vote(false);}, false);
@@ -94,8 +93,13 @@ function init() {
             // Load the contract
             ethervoteContract = web3.eth.contract(contractABI);
             ethervote = ethervoteContract.at(contractAddress);
+
+            // Watch Votes
+            watchVotes();  
         }
     }) 
+
+
 
     // Build Mist Menu
     // Add proposal to history
