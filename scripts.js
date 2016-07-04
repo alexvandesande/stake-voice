@@ -5,6 +5,8 @@ var voteMap = {};
 var contractAddress = '0x8b803d9f2bD4AEaa2a7c5265FB5684Fe3E68C879';
 var contractAddressTestnet = '0xa93c0838daa2631bb66eb460ccfd551e16e9306f';
 
+var startingBlock = 1800000;
+
 var contractABI = [{"constant":false,"inputs":[{"name":"proposalHash","type":"bytes32"},{"name":"pro","type":"bool"}],"name":"vote","outputs":[],"type":"function"},{"anonymous":false,"inputs":[{"indexed":true,"name":"proposalHash","type":"bytes32"},{"indexed":false,"name":"pro","type":"bool"},{"indexed":false,"name":"addr","type":"address"}],"name":"LogVote","type":"event"}];
 var history = [];
 
@@ -86,6 +88,7 @@ function init() {
             // if bytecode is small, then try switching networks
             if (r.length < 3) {
                 contractAddress = contractAddressTestnet;
+                startingBlock = 1000000;
             }
 
             // Load the contract
@@ -136,7 +139,7 @@ function watchVotes() {
     document.getElementById('status').textContent = 'Calculating votes...';
 
     // LogVote is an event on the contract. Read all since block 1 million
-    var logVotes = ethervote.LogVote({proposalHash: proposalHash}, {fromBlock: 1000000});
+    var logVotes = ethervote.LogVote({proposalHash: proposalHash}, {fromBlock: startingBlock});
     
     // Wait for the events to be loaded
     console.time('watch')
