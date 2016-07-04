@@ -4,6 +4,10 @@
 		"selected_items":
 		[
 			[
+				"tota",
+				"totalVotes"
+			],
+			[
 				"total",
 				"totalAgainst"
 			],
@@ -54,10 +58,6 @@
 			[
 				"co",
 				"cover"
-			],
-			[
-				"tota",
-				"totalAgainst"
 			],
 			[
 				"font",
@@ -548,7 +548,7 @@
 			"file": "scripts.js",
 			"settings":
 			{
-				"buffer_size": 11302,
+				"buffer_size": 11460,
 				"line_ending": "Unix",
 				"name": "scripts.js"
 			}
@@ -3365,15 +3365,15 @@
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 11302,
+						"buffer_size": 11460,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								11289,
-								11289
+								10485,
+								10485
 							]
 						],
 						"settings":
@@ -3385,7 +3385,7 @@
 							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 0.0,
-						"translation.y": 4246.0,
+						"translation.y": 4300.0,
 						"zoom_level": 1.0
 					},
 					"stack_index": 0,

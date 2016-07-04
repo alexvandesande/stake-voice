@@ -1,5 +1,7 @@
 // Set some initial variables
 var ethervote, ethervoteContract, proposalHash, totalVotes, proposal;
+var voteMap = {};
+
 var contractAddress = '0xa93c0838daa2631bb66eb460ccfd551e16e9306f';
 var contractAddressTestnet = '0xa93c0838daa2631bb66eb460ccfd551e16e9306f';
 var contractABI = [{"constant":false,"inputs":[{"name":"proposalHash","type":"bytes32"},{"name":"pro","type":"bool"}],"name":"vote","outputs":[],"type":"function"},{"anonymous":false,"inputs":[{"indexed":true,"name":"proposalHash","type":"bytes32"},{"indexed":false,"name":"pro","type":"bool"},{"indexed":false,"name":"addr","type":"address"}],"name":"LogVote","type":"event"}];
@@ -9,14 +11,12 @@ function init() {
     // Get parameters and set up the basic structure
     proposal = decodeURI(getParameterByName('proposal'));
     document.getElementById('proposal').textContent = proposal;
-
-    buildMistMenu();
     
     // Add event listeners
     document.getElementById('see-results').addEventListener('click', function(){
         document.getElementById("results").style.opacity = "1";
         document.getElementById("see-results").style.opacity = "0";
-        checkVotes();
+        watchVotes();
     } , false);
     document.getElementById('vote-support').addEventListener('click', function(){ vote(true);}, false);
     document.getElementById('vote-against').addEventListener('click', function(){ vote(false);}, false);
@@ -26,8 +26,7 @@ function init() {
     });
     newProposalInput.addEventListener('blur', newProposal);
 
-
-
+    // Checks Web3 support
     if(typeof web3 !== 'undefined' && typeof Web3 !== 'undefined') {
         // If there's a web3 library loaded, then make your own web3
         web3 = new Web3(web3.currentProvider);
@@ -54,7 +53,6 @@ function init() {
         document.getElementById("add-account").style.display = "block";
     }
 
-
     // Get the proposal
     proposalHash = web3.sha3(proposal);
     document.body.style.background = "#" + proposalHash.substr(2,6);
@@ -75,7 +73,8 @@ function init() {
         web3.eth.filter('latest').watch(function(e, res){
             if(!e) {
                 console.log('Block arrived ', res);
-                checkVotes();
+                document.getElementById('status').textContent = 'Calculating votes...';
+                calculateVotes();
             }
         });        
     }
@@ -92,16 +91,46 @@ function init() {
             ethervoteContract = web3.eth.contract(contractABI);
             ethervote = ethervoteContract.at(contractAddress);
         }
-    })    
+    }) 
+
+    // Build Mist Menu
+    // Add proposal to history
+    if (typeof(Storage) !== "undefined" && typeof(mist) !== "undefined") {
+        // Code for localStorage/sessionStorage.
+        var propHistory = localStorage.propHistory ? localStorage.propHistory.split(',') : [];
+        if (propHistory.indexOf(proposal)<0 && proposal.length > 0)
+            propHistory.unshift(proposal);
+
+        propHistory = propHistory.slice(0,20);
+        localStorage.setItem('propHistory', propHistory.join(','));
+
+        // mist.menu.clear(); 
+        mist.menu.add( 'main' ,{
+            position: 0,
+            name: 'Main Page',
+            selected: typeof proposal == 'undefined' || proposal == 'null'
+        }, function(){
+            window.location.search = '';
+        });
+
+        for (item of propHistory) {
+            if (item.length > 0 && item != 'null') {
+                mist.menu.add( item ,{
+                    name: item,
+                    selected: item == proposal 
+                }, function(){
+                    window.location.search = '?proposal=' + encodeURI(this.name);
+                });
+            }
+        }
+
+    }
+
 }
 
-function checkVotes() {        
+function watchVotes() {        
     // Set the texts and variables
-    var status = document.getElementById('status');
-    status.textContent = 'Calculating votes...';
-
-    var proMap = {};
-    var antiMap = {};
+    document.getElementById('status').textContent = 'Calculating votes...';
 
     // LogVote is an event on the contract. Read all since block 1 million
     var logVotes = ethervote.LogVote({proposalHash: proposalHash}, {fromBlock: 1000000});
@@ -109,22 +138,14 @@ function checkVotes() {
     // Wait for the events to be loaded
     console.time('watch')
     logVotes.watch(function(error, res){
+        console.log('event received');
+
         // Each vote will execute this function 
-        if (!error) {
-            var totalPro = 0;
-            var totalAgainst = 0;
-            
+        if (!error) {            
             // Get the current balance of a voter
             var bal = Number(web3.fromWei(web3.eth.getBalance(res.args.addr), "finney"));
 
-            // Check if they are for or against the statement
-            if (res.args.pro) {
-                proMap[res.args.addr] = bal;
-                antiMap[res.args.addr] = 0;
-            } else {
-                proMap[res.args.addr] = 0;
-                antiMap[res.args.addr] = bal;
-            }
+            voteMap[res.args.addr] = {balance: bal, support: res.args.pro}; 
 
             // Check if the current owner has already voted and show that on the interface
             if (web3.eth.accounts && web3.eth.accounts[0] == res.args.addr) {
@@ -137,40 +158,10 @@ function checkVotes() {
                 }
             }
 
-            // Count up all votes
-            Object.keys(proMap).map(function(a) { totalPro += parseFloat(proMap[a]); });
-            Object.keys(antiMap).map(function(a) { totalAgainst += parseFloat(antiMap[a]); });
-            totalVotes = totalPro + totalAgainst;
-
-            // Show a colored bar with the result
-            document.getElementById("results").style.display = "block";                
-            var proResult = document.getElementById('support');
-            proResult.textContent = convertToString(totalPro, totalVotes);
-            proResult.style.width = Math.round(totalPro*100/totalVotes) + "%";            
-            var againstResult = document.getElementById('opposition');
-            againstResult.textContent = convertToString(totalAgainst, totalVotes);
-            againstResult.style.width = Math.round(totalAgainst*100/totalVotes) + "%";
-
-            if (totalVotes>0)
-                mist.menu.update( proposal ,{ badge: Math.round(totalPro*100/totalVotes) + "%" });
-            
-            // End the calculation
-            document.getElementById("message").style.display = "none";
+            calculateVotes();
             console.timeEnd('watch');
         }
     })
-
-    setTimeout(function(){
-        // If the app doesn't respond after a timeout it probably has no votes
-        status.textContent = "";
-        console.log(totalVotes);
-        if (!(totalVotes > 0)){
-            document.getElementById("results").style.display = "none";
-            var message = document.getElementById("message");
-            message.textContent = "No votes yet. Vote now!";
-            message.style.display = "block";
-        }
-    }, 2000);
 }
 
 function convertToString(vote, total){
@@ -190,6 +181,48 @@ function convertToString(vote, total){
 
 }
 
+function calculateVotes() {
+    var totalPro = 0;
+    var totalAgainst = 0;
+
+    Object.keys(voteMap).map(function(a) { 
+        voteMap[a].balance = Number(web3.fromWei(web3.eth.getBalance(a), "finney")); 
+        
+        if (voteMap[a].support)
+            totalPro += parseFloat(voteMap[a].balance); 
+        else
+            totalAgainst += parseFloat(voteMap[a].balance); 
+    });
+
+    totalVotes = totalPro + totalAgainst;
+
+    // Show a colored bar with the result
+    document.getElementById("results").style.display = "block";                
+    var proResult = document.getElementById('support');
+    proResult.textContent = convertToString(totalPro, totalVotes);
+    proResult.style.width = Math.round(totalPro*100/totalVotes) + "%";            
+    var againstResult = document.getElementById('opposition');
+    againstResult.textContent = convertToString(totalAgainst, totalVotes);
+    againstResult.style.width = Math.round(totalAgainst*100/totalVotes) + "%";
+
+    if (totalVotes>0)
+        mist.menu.update( proposal ,{ badge: Math.round(totalPro*100/totalVotes) + "%" });
+    
+    // End the calculation
+    document.getElementById("message").style.display = "none";
+    
+    setTimeout(function(){
+        // If the app doesn't respond after a timeout it probably has no votes
+        document.getElementById('status').textContent = "";
+
+        if (!(totalVotes > 0)){
+            document.getElementById("results").style.display = "none";
+            var message = document.getElementById("message");
+            message.textContent = "No votes yet. Vote now!";
+            message.style.display = "block";
+        }
+    }, 2000);    
+}
 
 function vote(support) {
    console.log('vote', web3.eth.accounts.length);
@@ -235,42 +268,6 @@ function newProposal() {
     var newProposal = document.getElementById('new-proposal');
     var newProposalLink = document.getElementById('new-proposal-link');
     newProposalLink.href = '?proposal=' + encodeURI(newProposal.value);
-}
-
-function buildMistMenu() {
-
-    // Add proposal to history
-    if (typeof(Storage) !== "undefined") {
-        // Code for localStorage/sessionStorage.
-        var propHistory = localStorage.propHistory ? localStorage.propHistory.split(',') : [];
-        if (propHistory.indexOf(proposal)<0 && proposal.length > 0)
-            propHistory.unshift(proposal);
-
-        propHistory = propHistory.slice(0,20);
-        localStorage.setItem('propHistory', propHistory.join(','));
-
-        //Build Mist Menu
-        // mist.menu.clear(); 
-        mist.menu.add( 'main' ,{
-            position: 0,
-            name: 'Main Page',
-            selected: typeof proposal == 'undefined' || proposal == 'null'
-        }, function(){
-            window.location.search = '';
-        });
-
-        for (item of propHistory) {
-            if (item.length > 0 && item != 'null') {
-                mist.menu.add( item ,{
-                    name: item,
-                    selected: item == proposal 
-                }, function(){
-                    window.location.search = '?proposal=' + encodeURI(this.name);
-                });
-            }
-        }
-
-    }
 }
 
 
