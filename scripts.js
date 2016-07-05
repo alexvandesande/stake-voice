@@ -95,7 +95,8 @@ function init() {
             ethervote = ethervoteContract.at(contractAddress);
 
             // Watch Votes
-            watchVotes();  
+            if (proposal.length > 0 && proposal != 'null')
+                watchVotes();  
         }
     }) 
 
@@ -141,6 +142,11 @@ function init() {
 function watchVotes() {        
     // Set the texts and variables
     document.getElementById('status').textContent = 'Calculating votes...';
+
+    setTimeout(function(){
+        // If the app doesn't respond after a timeout it probably has no votes
+        document.getElementById('status').textContent = "";
+    }, 3000);
 
     // LogVote is an event on the contract. Read all since block 1 million
     var logVotes = ethervote.LogVote({proposalHash: proposalHash}, {fromBlock: startingBlock});
