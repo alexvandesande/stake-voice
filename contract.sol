@@ -11,4 +11,7 @@ contract EtherVote {
         // Log the vote
         LogVote(proposalHash, pro, msg.sender);
     }
+
+    // again, no ether
+    function () { throw; }
 }
