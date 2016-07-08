@@ -3,8 +3,8 @@
 var ethervote, ethervoteContract, proposalHash, totalVotes, proposal, totalPro, totalAgainst;
 var voteMap = {};
 
-var contractAddress = '0xe9dA10F1aba727bfB3641846eD4D5BBf2ADd39c4';
-var contractAddressTestnet = '0x0D55b812d040ad3df5fbA038e8C24EDf4D90e5C8';
+var contractAddress = '0x1e9d5e4ed8ef31cfece10b4c92c9057f991f36bc';
+var contractAddressTestnet = '0x47ab800a75990b0bd5bb4a54cfbec777972c973c';
 
 var startingBlock = 1800000;
 
@@ -61,7 +61,7 @@ function init() {
     proposalHash = web3.sha3(proposal);
     document.body.style.background = "#" + proposalHash.substr(2,6);
 
-    if (proposal == 'null' || proposal == '') {
+    if (typeof proposal == 'undefined' || proposal == 'null' || proposal == '') {
         // No Proposals are set
         document.getElementById("results").style.display = "none";
         document.getElementById("see-results").style.display = "none";
@@ -97,7 +97,7 @@ function init() {
             ethervote = ethervoteContract.at(contractAddress);
 
             // Watch Votes
-            if (proposal.length > 0 && proposal != 'null')
+            if (proposal && proposal.length > 0 && proposal != 'null')
                 watchVotes();  
         }
     }) 
@@ -109,7 +109,7 @@ function init() {
     if (typeof(Storage) !== "undefined" && typeof(mist) !== "undefined") {
         // Code for localStorage/sessionStorage.
         var propHistory = localStorage.propHistory ? localStorage.propHistory.split(',') : [];
-        if (propHistory.indexOf(proposal)<0 && proposal.length > 0)
+        if (proposal && proposal.length > 0 && propHistory.indexOf(proposal)<0)
             propHistory.unshift(proposal);
 
         propHistory = propHistory.slice(0, 10);
